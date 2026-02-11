@@ -154,4 +154,58 @@ Nach der Stabilisierung der Hardware-Ebene (Layer 1) und des Betriebssystems (La
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/8522af5d-8dc5-403e-b25f-a10c0b823066" />
 
 
+## 🚀 Phase 4: Web-Server Deployment & Remote-Development Workflow
+
+Nach der Einrichtung der Docker-Engine war das Ziel, einen echten Web-Service bereitzustellen und von einer manuellen CLI-Verwaltung zu einer professionellen IDE-gestützten Entwicklungsumgebung zu wechseln.
+
+### 1. Einrichtung der Entwicklungsumgebung (IDE Setup)
+**Ziel:** Implementierung eines "Remote-SSH" Workflows, um Code lokal auf dem Mac (VS Code) zu schreiben und direkt auf der Raspberry Pi (Target) auszuführen.
+
+* **Tooling:** Visual Studio Code + Remote-SSH Extension.
+* **Konfiguration:**
+    ```ssh
+    # ~/.ssh/config (macOS Client)
+    Host pi5-node-01
+        HostName 192.168.0.20
+        User robert
+        IdentityFile ~/.ssh/id_rsa
+    ```
+* **Vorteil:** Direkte Bearbeitung von Dateien auf dem Server ohne Latenz oder VIM/Nano-Abhängigkeit.
+
+### 2. Projektstruktur & Content
+Erstellung einer statischen Web-Präsenz zur Validierung des Webservers.
+* **Pfad:** `/home/robert/mainz-web/index.html`
+* **Code (HTML5):**
+    ```html
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Mainz Cluster</title>
+        <style>
+            body { background-color: #003366; color: #ffffff; font-family: sans-serif; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <h1>Mainz Cluster v2.0</h1>
+        <p>Deployed via Docker Container on Raspberry Pi 5</p>
+        <p>Status: <strong>OPERATIONAL</strong></p>
+    </body>
+    </html>
+    ```
+
+### 3. Container Deployment (Nginx)
+Bereitstellung des Webservers unter Verwendung von **Bind Mounts** und **Port Mapping**.
+
+**Docker Befehl:**
+```bash
+docker run -d \
+  --name mi-web-server \
+  -p 8080:80 \
+  -v ~/mainz-web/index.html:/usr/share/nginx/html/index.html:ro \
+  nginx
+```
+<img width="1462" height="532" alt="image" src="https://github.com/user-attachments/assets/762c3f0c-7716-491b-9dbc-6479a81a0596" />
+
+
+
 
