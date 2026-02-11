@@ -113,4 +113,45 @@ Entwurf einer **"Physical Bypass"**-Strategie, um die Hardware mittels eines sek
 
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/8e84e304-ab54-45d9-9f2b-f1c488e0fcb7" />
 
+## 🐳 Phase 3: Container Runtime & Identity Management
+
+Nach der Stabilisierung der Hardware-Ebene (Layer 1) und des Betriebssystems (Layer 2) erfolgte die Konfiguration der logischen Identität und die Implementierung der Container-Virtualisierungsschicht.
+
+### 1. DNS & Hostname Konfiguration (Local Resolution)
+**Ziel:** Eliminierung der Abhängigkeit von flüchtigen IPs und Etablierung einer logischen Nomenklatur (`node-01`, `proxmox`) ohne externen DNS-Resolver.
+
+* **Netzwerklogik:** Implementierung einer statischen Namensauflösung via `/etc/hosts` auf allen Cluster-Nodes (Client macOS, Master, Worker).
+* **Identitäts-Persistenz:** Permanente Änderung der Hostnamen mittels `hostnamectl` und `sed` zur Ablösung der generischen Defaults (`raspberrypi`) durch Infrastruktur-IDs (`pi5-node-01`).
+* **Ergebnis:** Reibungslose Node-to-Node Kommunikation via FQDN-Simulation.
+    * `ping pi5-node-01` ✅
+    * `ping pi4-node-01` ✅
+
+### 2. Installation der Docker Engine (Enterprise Standard)
+**Ziel:** Bereitstellung einer sicheren, aktuellen Container-Laufzeitumgebung (Runtime), unter Umgehung der oft veralteten Debian-Repository-Pakete.
+
+* **Security & Trust (Keyrings):**
+    * Download und Installation des offiziellen **Docker GPG Keys** in `/etc/apt/keyrings/docker.gpg`.
+    * *Grund:* Gewährleistung der Paket-Authentizität und Schutz der Supply Chain.
+* **Repository-Konfiguration:**
+    * Dynamische Injektion des offiziellen Docker-Upstream-Repos unter Berücksichtigung der CPU-Architektur (`arm64`) und OS-Version (`bookworm`).
+* **Installierte Artefakte:**
+    * `docker-ce`: Die Core Engine.
+    * `docker-ce-cli`: Command Line Interface.
+    * `containerd.io`: Industriestandard-Runtime.
+    * `docker-buildx-plugin` & `docker-compose-plugin`: Erweiterungen für Multi-Arch-Builds und Orchestrierung.
+
+### 3. Rechteverwaltung (Privilege Management)
+**Ziel:** Operatives Container-Management ohne permanente Root-Rechte (Least Privilege Principle).
+
+* **Maßnahme:** Hinzufügen des administrativen Users `robert` zur Systemgruppe `docker`.
+    * Befehl: `sudo usermod -aG docker $USER`
+* **Technischer Effekt:** Gewährung von Lese-/Schreibrechten auf den Unix-Socket des Docker Daemons (`/var/run/docker.sock`).
+
+### 4. Validierung (Smoke Test)
+**Test:** Deployment des `hello-world` Containers.
+**Ergebnis:** Erfolgreicher Kontakt zur Docker Registry, Layer-Pull, Container-Instanziierung und Log-Output. Bestätigung der Internet-Konnektivität und der Integrität des Daemons.
+
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/8522af5d-8dc5-403e-b25f-a10c0b823066" />
+
+
 
