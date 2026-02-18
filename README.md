@@ -206,6 +206,115 @@ docker run -d \
 ```
 <img width="1462" height="532" alt="image" src="https://github.com/user-attachments/assets/762c3f0c-7716-491b-9dbc-6479a81a0596" />
 
+🚀 Praxis-Guide: Aufbau eines Mini-Clusters mit Portainer
+Das Ziel ist es, die Verwaltung deiner Geräte zu zentralisieren. Wir verwenden den Raspberry Pi 5 als "Kontrollturm" (Manager) und den Raspberry Pi 4 als "Arbeitsknoten" (Worker).
 
+📋 Voraussetzungen
+Docker ist auf beiden Raspberry Pis installiert.
+
+Portainer läuft auf dem Pi 5 (Port 9443).
+
+SSH-Zugang zum Pi 4.
+
+🛠️ Schritt 1: Den Worker-Knoten vorbereiten (Raspberry Pi 4)
+Damit der Pi 5 dem Pi 4 Befehle erteilen kann, müssen wir einen "Agenten" installieren.
+
+Verbinde dich mit dem Pi 4 über SSH.
+
+Überprüfe Docker:
+
+Bash
+docker --version
+Installiere den Portainer Agent:
+Führe diesen Befehl aus, um das "Kommunikationstor" zu öffnen:
+
+Bash
+docker run -d \
+  -p 9001:9001 \
+  --name portainer_agent \
+  --restart=always \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /var/lib/docker/volumes:/var/lib/docker/volumes \
+  portainer/agent:latest
+Ermittle die IP-Adresse des Pi 4:
+Diese wird im nächsten Schritt benötigt.
+
+Bash
+hostname -I
+🌉 Schritt 2: Die Knoten verknüpfen (Im Browser)
+Nun konfigurieren wir den "Kontrollturm" auf dem Pi 5.
+
+Öffne Portainer in deinem Browser: https://pi5-node-01:9443.
+
+Gehe zu Environments > + Add environment.
+
+Wähle Docker Standalone aus und klicke auf Connect a remote node.
+
+Wähle die Option Agent aus.
+
+Fülle das Feld Name mit Pi4-Worker aus.
+
+Fülle das Feld Environment address mit [IP_DEINES_PI4]:9001 aus (Beispiel: 192.168.1.55:9001).
+
+Klicke auf Connect.
+
+🕹️ Schritt 3: Remote-Deployment Experiment
+Wir testen nun, ob alles funktioniert, indem wir einen Container auf dem Pi 4 über das Dashboard des Pi 5 bereitstellen.
+
+Wähle auf der Home-Seite von Portainer die neue Umgebung Pi4-Worker aus.
+
+Gehe zu Containers > + Add container.
+
+Setze den Name auf web-remota-pi4.
+
+Setze das Image auf nginx:latest.
+
+Unter Manual network port publishing: Host 8080 -> Container 80.
+
+Klicke auf Deploy the container.
+
+Der Härtetest: Öffne in deinem Browser http://[IP_DEINES_PI4]:8080. Wenn du "Welcome to nginx!" siehst, lebt dein Cluster!
+
+🏛️ Architektur-Zusammenfassung
+Manager-Knoten (Pi 5): Das ist das Gehirn. Hier befindet sich die Weboberfläche von Portainer, und von hier aus triffst du alle Entscheidungen.
+
+Worker-Knoten (Pi 4): Das sind die Muskeln. Er führt die Container aus, die ihm der Manager über den Portainer Agent zuweist.
+
+Der Vorteil: Du musst dich nicht mehr über das Terminal in jede Maschine einloggen; du verwaltest deine gesamte Infrastruktur bequem über einen einzigen Browser-Tab.
+
+🧹 Aufräumen und nächste Schritte
+Um dein System sauber zu halten, lösche den Test-Container:
+
+Wähle in Portainer (innerhalb des Pi 4) den Container web-remota-pi4 aus.
+
+Klicke auf Remove und bestätige.
+
+🗺️ Was kannst du als Nächstes lernen?
+Option A: Stacks (Docker Compose): Komplexe Anwendungen (mehrere Container gleichzeitig) mit Konfigurationsdateien direkt in Portainer bereitstellen.
+
+Option B: Nginx Proxy Manager: Vergiss IP-Adressen und Ports und nutze stattdessen lokale Domainnamen wie http://pi4.local.
+
+Verwandte Notiz: [[7 Raspy 4 -> Panel de control de Portainer]]
+
+📚 Zum Lernen
+🖥️ 1. Terminal-Theorie (Was heute hinter den Kulissen passierte)
+SSH (Secure Shell): Als du dein VS Code mit dem Pi 4 (robert@pi4-node-01) verbunden hast, hast du SSH verwendet. Es ist ein Protokoll, das einen verschlüsselten Tunnel erstellt. Alles, was du tippst, reist sicher, sodass niemand in deinem WLAN-Netzwerk deine Befehle abfangen kann.
+
+Dämonen (Daemons): Als du den Portainer-Agenten ausgeführt hast, hast du das Flag -d (Detached) hinzugefügt. In der Linux-Welt nennt man Programme, die im Hintergrund laufen, ohne dein Terminal zu blockieren, "Dämonen". Die Docker-Engine selbst ist ein Dämon (dockerd).
+
+Der Socket (/var/run/docker.sock): Heute hast du diese Datei an den Agenten übergeben. Ein Socket in Linux ist keine normale Textdatei, sondern ein direktes "Kommunikationsrohr" zum Gehirn eines Programms. Durch das Mapping hast du dem Agenten die Hauptschlüssel für das Docker deines Pi 4 gegeben.
+
+🌐 2. Netzwerk-Theorie (Die Brücke zwischen deinen Raspberrys)
+Lokale IP-Adressen (LAN): Der Befehl hostname -I hat dir die interne IP deines Pi 4 verraten (z. B. 192.168.x.x). Diese IP ist privat und wird von deinem Heimrouter zugewiesen; sie ist aus dem Internet nicht direkt sichtbar.
+
+Ports (Die "Wohnungen" des Servers): Dein Pi 4 hat nur eine IP (stell dir vor, das ist die Adresse des Gebäudes), aber Tausende von Ports (die Wohnungsnummern). Damit es keine Konflikte gibt, nutzt jeder Dienst einen anderen.
+
+Port 22: Genutzt von deinem VS Code (SSH).
+
+Port 9001: Hört auf die Befehle von Portainer (Der Agent).
+
+Port 8080: Dorthin hast du deinen Nginx-Webserver gemappt.
+
+TCP (Transmission Control Protocol): Das Protokoll, das du heute ausgewählt hast. TCP führt einen "3-Wege-Handschlag" (3-Way Handshake) durch, bevor Daten gesendet werden: "Bist du bereit zu empfangen? Ja, ich bin bereit. Okay, hier kommt das Paket". Es ist etwas langsamer als UDP, garantiert aber, dass die Webseite vollständig geladen wird, ohne dass auch nur ein einziger Buchstabe des Codes verloren geht
 
 
