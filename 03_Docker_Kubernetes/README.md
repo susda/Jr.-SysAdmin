@@ -177,3 +177,124 @@ docker compose up -d
 
 # 6. Health Check: Anzeige des Echtzeit-Status aller laufenden Container
 docker ps
+
+🏦 Lab: Sichere Microservices-Architektur („Die Bank“)
+Dieses Repository dokumentiert die Bereitstellung einer klassischen Webinfrastruktur (WordPress + MariaDB) unter Verwendung von Docker Compose, wobei der Fokus auf Sicherheit durch Netzwerkisolierung, Datenpersistenz und automatisierte Bereitstellung als Code (IaC) liegt.
+
+🎯 Projektziele
+Bereitstellung einer orchestrierten Multi-Container-Umgebung.
+Implementierung von Netzwerkisolierung (Network Isolation) zum Schutz der Datenbank.
+Gewährleistung der Datenpersistenz durch verwaltete Volumes.
+Dokumentation des Fehlerbehebungsprozesses in lokalen Netzwerkumgebungen.
+🏗️ Systemarchitektur
+Das Projekt basiert auf der Analogie einer Bank, um den Datenfluss und die Sicherheit zu erklären:
+
+Der Kassierer (Frontend - WordPress): Dies ist der für den Benutzer zugängliche Dienst. Er kommuniziert über einen bestimmten Port nach außen, hängt aber vollständig vom Tresor ab, um zu funktionieren.
+Der Tresor (Backend - MariaDB): Enthält die sensiblen Informationen. Er hat keinen direkten Zugriff aus dem Internet, was die Angriffsfläche drastisch reduziert.
+Der Tunnel (Privates Netzwerk - bank_net): Ein virtueller Kommunikationskanal, über den nur diese beiden Dienste miteinander sprechen können.
+🛠️ Schritt-für-Schritt-Bereitstellungshandbuch
+
+Vorbereitung der Umgebung
+Bevor Sie beginnen, ist es wichtig sicherzustellen, dass der Benutzer die richtigen Berechtigungen für das Arbeitsverzeichnis hat, um Schreibfehler zu vermeiden.
+
+Bash
+# Wir stellen sicher, dass das Verzeichnis dem aktuellen Benutzer gehört
+sudo chown -R $USER:$USER ~/opt
+
+# Wir erstellen das Projektverzeichnis und wechseln hinein
+mkdir -p ~/opt/banco_wp && cd ~/opt/banco_wp
+Definition der Infrastruktur (IaC)
+Wir erstellen die Datei docker-compose.yml. Diese Datei fungiert als Bauplan für unser gesamtes virtuelles Rechenzentrum.
+
+YAML
+services:
+  # Datenbank-Dienst (Der Tresor)
+  db:
+    image: mariadb:10.11
+    container_name: vault_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_super_secreto # Master-Passwort
+      MYSQL_DATABASE: wordpress_db            # Zu erstellende Datenbank
+      MYSQL_USER: wp_user                     # Anwendungsbenutzer
+      MYSQL_PASSWORD: wp_password_secreto     # Benutzerpasswort
+    volumes:
+      - db_data:/var/lib/mysql                # Tabellenpersistenz
+    networks:
+      - bank_net                              # Verbindung zum privaten Netzwerk
+
+  # Web-Dienst (Der Kassierer)
+  wordpress:
+    image: wordpress:latest
+    container_name: cashier_wp
+    depends_on:
+      - db                                    # Warten, bis die DB bereit ist
+    restart: unless-stopped
+    ports:
+      - "8082:80"                             # Host-Port-Mapping : Container-Port
+    environment:
+      WORDPRESS_DB_HOST: db:3306              # Auflösung über internes Docker-DNS
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_password_secreto
+      WORDPRESS_DB_NAME: wordpress_db
+    volumes:
+      - wp_data:/var/www/html                 # Webdateien-Persistenz
+    networks:
+      - bank_net                              # Verbindung zum privaten Netzwerk
+
+volumes:
+  db_data:                                    # Volume für die Datenbank
+  wp_data:                                    # Volume für die WP-Dateien
+
+networks:
+  bank_net:                                   # Isoliertes Netzwerk vom Typ Bridge
+Warum konfigurieren wir das so?
+depends_on: Verhindert „Connection Refused“-Fehler durch Sicherstellung einer logischen Startreihenfolge.
+ports omitidos en db: Nach dem Prinzip der minimalen Berechtigung darf die Datenbank von außerhalb des Docker-Clusters nicht zugänglich sein.
+DNS Interno: WordPress sucht nach db über seinen Dienstnamen, nicht über die IP, wodurch die Infrastruktur resilient gegen Neustarts wird.
+3. Ausführung und Validierung
+Um das System in Gang zu setzen, verwenden wir den Docker-Orchestrierungsbefehl:
+
+Bash
+# Bereitstellung im Hintergrund
+docker compose up -d
+
+# Überprüfung des Status der Dienste
+docker ps
+🔍 Datenintegritätsprüfung
+Als Systemadministrator ist es entscheidend zu validieren, dass die interne Kommunikation korrekt ist. Wir führen eine manuelle Inspektion innerhalb des Datenbankcontainers durch:
+
+Bash
+# Interaktiver Zugriff auf die Datenbank-Engine im Container
+docker exec -it vault_db mariadb -u wp_user -p
+
+# SQL-Validierungsbefehle:
+show databases;
+use wordpress_db;
+show tables;
+Wenn die Antwort Empty set ist, bedeutet dies, dass die Infrastruktur bereit ist und auf die erste Konfiguration über den Browser wartet.
+
+🛠️ Fehlerbehebung: Gelerntes
+Während der Entwicklung wurden folgende kritische Punkte identifiziert und gelöst:
+
+Netzwerkkonflikte (VPN): Es wurde festgestellt, dass lokale Verbindungen fehlschlagen können, wenn der Client (MacBook) eine aktive VPN hat, die den Verkehr umleitet. Die Lösung war das Deaktivieren des Tunnels, um lokales Routing zu ermöglichen.
+Persistenz: Es wurde validiert, dass die Informationen bei Verwendung von Volumes Zerstörungsbefehle wie docker compose down überleben.
+Linux-Berechtigungen: Der Fehler Permission denied wurde behoben, indem die Ownership der mit den Containern verknüpften Host-Ordner angepasst wurde.
+🚀 Demonstrierte Fähigkeiten
+Linux-Server-Administration (Ubuntu/Debian).
+Containerisierung mit Docker und Docker Compose.
+Container-Netzwerke und Sicherheit (logische Firewalling).
+Verwaltung relationaler Datenbanken (MariaDB/MySQL).
+Technische Dokumentation von IT-Prozessen.
+Wie benutze ich dieses Repository?
+Klonen Sie das Repository.
+Stellen Sie sicher, dass Docker installiert ist.
+Führen Sie docker compose up -d aus.
+Greifen Sie auf http://localhost:8082 zu, um die Installation abzuschließen.
+
+
+![alt text](image-1.png)
+
+
+VPN- Das Problem mit VPN und die Lösung.
+![alt text](image.png)
