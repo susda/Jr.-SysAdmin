@@ -23,6 +23,10 @@ Nach der Stabilisierung der Hardware-Ebene (Layer 1) und des Betriebssystems (La
 ### Rechteverwaltung (Privilege Management)
 **Ziel:** Operatives Container-Management ohne permanente Root-Rechte.
 ```bash
+
+
+
+
 sudo usermod -aG docker $USER
 
 
