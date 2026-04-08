@@ -190,3 +190,45 @@ Wie Kubernetes Entscheidungen über das Scheduling trifft.
 Warum CPU-Architekturen (arm64 vs. arm/v7) bei der Image-Wahl entscheidend sind.
 
 Wie man ein Self-Healing-System konfiguriert, das Workloads automatisch neu verteilt.
+
+
+# 🚀 Meilenstein: Die große Migration – Von Docker zu Kubernetes (K3s)
+
+**Datum:** 01. April 2026  
+**Projekt:** "El Banco" (WordPress + MariaDB)  
+**Status:** Erfolgreich in Produktion (K3s Cluster)
+
+## 🎯 Zielsetzung
+Das Hauptziel dieses Meilensteins war die Migration unserer Webanwendung von einem monolithischen Docker-Compose-Setup (Single-Node) in ein ausfallsicheres, orchestriertes Kubernetes-Cluster, bestehend aus einem Master-Node (Pi 5) und einem Worker-Node (Pi 4).
+
+## 🏗️ Systemarchitektur
+
+
+
+Um die Anwendung in Kubernetes zu betreiben, haben wir die monolithische Struktur in Microservices aufgeteilt. Jeder Service nutzt zwei primäre Kubernetes-Ressourcen:
+1. **Deployment:** Der "Manager", der sicherstellt, dass die gewünschte Anzahl an Pods (Containern) immer läuft.
+2. **Service:** Der "Netzwerk-Router", der den Pods eine feste interne IP (ClusterIP) oder einen externen Zugang (NodePort) zuweist.
+
+### Komponenten:
+* **Datenbank (Das Backend):** * Image: `mariadb:10.11`
+  * Netzwerk: Isoliert über `ClusterIP` (Port 3306). Nur innerhalb des Clusters erreichbar.
+* **Frontend (Das CMS):** * Image: `wordpress:latest`
+  * Netzwerk: Exponiert in das lokale Heimnetzwerk über einen `NodePort` (Port 30082).
+
+## 🛠️ Durchgeführte Schritte
+
+1. **Rückbau der alten Infrastruktur:** Herunterfahren des alten Docker-Compose-Setups (`docker compose down`), um Portkonflikte zu vermeiden.
+2. **Implementierung der Datenbank-Manifeste:** Erstellung und Anwendung von `db-deployment.yaml` und `db-service.yaml`.
+3. **Implementierung der Frontend-Manifeste:** Erstellung und Anwendung von `wp-deployment.yaml` und `wp-service.yaml`. Die Verbindung zur Datenbank erfolgte dynamisch über den DNS-Namen des K8s-Services (`vault-db-service`).
+4. **Verifizierung:** Überprüfung des Status mit `kubectl get pods` und `kubectl get svc`.
+
+## 💥 Der Chaos-Test (Self-Healing-Validierung)
+
+
+
+Um die Ausfallsicherheit (High Availability) und das *Self-Healing* des Kubernetes-Clusters zu beweisen, haben wir einen "Chaos-Test" durchgeführt:
+* **Aktion:** Absichtliches Löschen eines aktiven Pods (`kubectl delete pod <pod-name>`).
+* **Ergebnis:** Das Kubernetes-Control-Plane hat den Ausfall in Millisekunden erkannt und den Pod sofort neu erstellt (`Terminating` ➡️ `ContainerCreating` ➡️ `Running`). Die Anwendung blieb für den Endbenutzer ununterbrochen erreichbar.
+
+## 🔜 Nächste Schritte
+* **Persistenz (Persistent Volumes):** Behebung des "Amnesie"-Problems der Container. Implementierung von PVs und PVCs, um sicherzustellen, dass Datenbankeinträge auch nach dem Zerstören eines Pods dauerhaft auf der Festplatte gespeichert bleiben.
