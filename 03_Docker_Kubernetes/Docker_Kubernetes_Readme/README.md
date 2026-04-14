@@ -1,234 +1,140 @@
-# Homelab Phase 3: Containerisierung & Orchestrierung
+# 🚀 Homelab Projekt: Von Docker zu Kubernetes (K3s)
 
-Dieses Repository dokumentiert die dritte Phase meines Homelab-Projekts: den Aufbau einer stabilen, sicheren und skalierbaren containerbasierten Infrastruktur auf Basis von **Docker**, **Docker Compose** und **Portainer**. Der Fokus liegt auf den Prinzipien von *Infrastructure as Code* (IaC), Netzwerkisolierung und *Disaster Recovery Protocols*.
+Dieses Repository dokumentiert den Aufbau einer stabilen, sicheren und skalierbaren containerbasierten Infrastruktur. Das Projekt begann mit **Docker & Portainer** (Phase 3) und entwickelte sich zu einem voll funktionsfähigen **High-Availability K3s Kubernetes Cluster** (Phase 4 & 5) auf einem Raspberry Pi 5 (Master) und Pi 4 (Worker).
 
-### Projektziele
-
-* ✅ **Imperativ zu Deklarativ:** Migration von manuellen `docker run` Befehlen zu deklarativen YAML-Definitionen (Infrastructure as Code).
-* ✅ **Netzwerkisolierung (Security):** Implementierung isolierter Backend-Netzwerke zum Schutz sensibler Microservices.
-* ✅ **Datenpersistenz:** Sicherstellung, dass kritische Daten (Datenbanken, Webdateien) Container-Neustarts und Host-Löschungen überleben.
-* ✅ **Disaster Recovery Protokoll:** Etablierung verifizierter Backup- und Wiederherstellungsverfahren.
-* ✅ **Multi-Node Orchestrierung:** Aufbau eines Mini-Clusters unter Verwendung der Portainer Agent Architektur.
+Der Fokus liegt auf den Prinzipien von *Infrastructure as Code* (IaC), Netzwerkisolierung, *Disaster Recovery* und moderner Microservice-Orchestrierung.
 
 ---
 
-## 🏛️ Schematische Übersicht der Kernkonzepte
+## 🎯 Projektziele & Meilensteine
 
-Um die technischen Zusammenhänge besser zu verstehen, haben wir die drei wichtigsten Lernschritte visuell zusammengefasst:
-
-
+- ✅ **Imperativ zu Deklarativ:** Migration von manuellen Befehlen zu YAML-Definitionen (IaC).
+- ✅ **Netzwerkisolierung (Security):** Isolierte Backend-Netzwerke zum Schutz sensibler Microservices.
+- ✅ **Datenpersistenz:** Sicherstellung, dass kritische Daten Neustarts und Pod-Zerstörungen überleben.
+- ✅ **Disaster Recovery Protokoll:** Etablierung verifizierter Backup- und Wiederherstellungsverfahren.
+- ✅ **Multi-Node Orchestrierung:** Verteilung von Workloads über mehrere physische Maschinen (K3s).
+- ✅ **Secret Management:** Verschlüsselung von Zugangsdaten nach Industriestandard.
+- ✅ **Load Balancing & Ingress:** Bereitstellung der Services über professionelle Domains (z.B. `elbanco.local`).
 
 ---
 
-## Meilenstein 1: Single-Node Docker & Disaster Recovery
+# 🐳 Phase 3: Single-Node Docker & Disaster Recovery
 
 Im ersten Schritt haben wir die Laufzeitumgebung stabilisiert und eine komplexe Webanwendung („Das Bankhaus“) auf einem einzigen Knoten aufgebaut.
 
 ### 1.1 Container Runtime & Identity Management
-Bevor wir Dienste bereitstellen konnten, mussten wir die logische Identität des Pi 5 Knoten konfigurieren und die Docker Engine installieren.
-
-* **Identität:** Wir haben flüchtige IPs eliminiert und eine logische Nomenklatur (`pi5-node-01`) via `/etc/hosts` und `hostnamectl` etabliert.
-* **Installation:** Bereitstellung des offiziellen Docker GPG Keys in `/etc/apt/keyrings/docker.gpg` und Installation der Enterprise Artefakte (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-compose-plugin`).
+Bevor wir Dienste bereitstellen konnten, mussten wir die logische Identität des Pi 5 Knoten konfigurieren:
+* **Identität:** Etablierung einer logischen Nomenklatur (`pi5-node-01`) via `/etc/hosts` und `hostnamectl`.
+* **Installation:** Bereitstellung des offiziellen Docker GPG Keys und Installation der Docker Engine & Docker Compose.
 
 ### 1.2 "Das Bankhaus": Netzwerkisolierung & Sicherheit
-Wir deployten eine Multi-Container-Anwendung (WordPress + MariaDB) unter Verwendung des Konzepts „Das Bankhaus“, um den Datenfluss und die Sicherheitsschichten zu demonstrieren.
+Wir deployten eine Multi-Container-Anwendung (WordPress + MariaDB), um den Datenfluss zu demonstrieren.
 
-* **Der Kassierer (Frontend - WordPress):** Hört intern auf Port 80 und ist über Port 8082 von außen (MacBook Air) erreichbar.
-* **Der Tresor (Backend - MariaDB):** Kommuniziert **ausschließlich** intern im isolierten `bank_net` Netzwerk auf Port 3306. **Keine** Ports nach außen exponiert. Angriffsfläche drastisch reduziert.
+* **Der Kassierer (Frontend - WordPress):** Exponiert in das lokale Heimnetzwerk (Port 8082).
+* **Der Tresor (Backend - MariaDB):** Kommuniziert **ausschließlich** intern im isolierten `bank_net` Netzwerk auf Port 3306. 
 
-> *Siehe visuelle Erklärung in Panel 1: "NETZWERKISOLIERUNG ('DAS BANKHAUS')".*
+> 🛡️ **Security Check:** Die Datenbank hat keine offenen Ports nach außen. Die Angriffsfläche ist drastisch reduziert.
 
-**Validierung des Deployments:**
-<img width="1024" height="559" alt="Validation des hello-world Containers" src="./images/image_e4199f.png" />
+### 1.3 Disaster Recovery Protokoll (Lessons Learned)
+Wir simulierten einen totalen Datenverlust (`docker compose down -v`) und etablierten ein verifiziertes Protokoll.
 
-### 1.3 Datenpersistenz & Berechtigungen
-Standard-Docker-Volumes (`db_data`, `wp_data`) wurden konfiguriert, damit Daten Neustarts überleben. Wir mussten die Berechtigungen (`chown`) der Linux-Ordner manuell anpassen, damit Docker korrekt in die Volumes schreiben konnte.
-
-### 1.4 Disaster Recovery Protokoll (Lessons Learned)
-Dies war der kritischste Lernmoment. Wir simulierten einen totalen Datenverlust (`docker compose down -v`) und eine fehlerhafte Wiederherstellung, bevor wir das verifizierte Protokoll etablierten.
-
-> *Siehe visuelle Erklärung in Panel 2: "DISASTER RECOVERY PROTOKOLL".*
-
-#### Die Herausforderung: Das fehlerhafte Backup
-Wir vertrauten auf ein Backup, das mit dem falschen Befehl (`mariadb_dump` statt `mysqldump`) erstellt wurde. Es enthielt nur Docker-Fehlermeldungen. Als wir die Volumes löschten, waren alle Daten verloren.
-
-#### Die Lösung: Das verifizierte Protokoll
-1.  **Backup:** Nutzung des verifizierten `mysqldump` Befehls.
-    ```bash
-    docker exec vault_db mysqldump -u wp_user -pwp_password_secreto wordpress_db > backup.sql
-    ```
-2.  **Verifizierung:** Prüfung des Inhalts mit `head` (Echter SQL Code vs. Fehlertext).
-3.  **Deterministische Wiederherstellung:**
-    ```bash
-    cat backup.sql | docker exec -i vault_db mariadb -u wp_user -pwp_password_secreto wordpress_db
-    ```
-
----
-
-## Meilenstein 2: Multi-Node Orchestrierung & Stacks
-
-Jetzt, da wir wissen, wie man einen einzelnen Knoten sichert und wiederherstellt, ist das Ziel, die Infrastruktur **ausfallsicher** zu machen und die **Raspberry Pi 4** als Worker-Knoten zu integrieren.
-
-### 2.1 Aufbau eines Mini-Clusters mit Portainer
-
-Wir verwenden den Raspberry Pi 5 als "Kontrollturm" (Manager Node) und den Raspberry Pi 4 als "Arbeitsknoten" (Worker Node). Die Kommunikation erfolgt über die Portainer Agent Architektur.
-
-> *Siehe visuelle Erklärung in Panel 3: "MULTI-NODE CLUSTER (PORTAINER AGENT ARCHITEKTUR)".*
-
-**Schritt 1: Den Worker-Knoten vorbereiten (Raspberry Pi 4)**
-Wir installieren den Portainer Agent: 
+**Das verifizierte Protokoll:**
 ```bash
-docker run -d \
-  -p 9001:9001 \
-  --name portainer_agent \
-  --restart=always \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /var/lib/docker/volumes:/var/lib/docker/volumes \
-  portainer/agent:latest
+# 1. Verifiziertes Backup erstellen
+docker exec vault_db mysqldump -u wp_user -pwp_password_secreto wordpress_db > backup.sql
+
+# 2. Deterministische Wiederherstellung
+cat backup.sql | docker exec -i vault_db mariadb -u wp_user -pwp_password_secreto wordpress_db
 
 
-version: '3.8' # Compose V3 API Standard
+☸️ Phase 4: K3s Multi-Node Cluster (High Availability)
+Nach der erfolgreichen Implementierung von Docker haben wir die Infrastruktur auf ein verteiltes System skaliert. Wir nutzen K3s (Lightweight Kubernetes), um die Rechenleistung beider Raspberry Pis zu bündeln.
 
-services:
-  web-diagnostico:
-    image: nginxdemos/hello:latest # Leichtgewichtiger Web-Server
-    container_name: app-diagnostico-pi4
-    restart: unless-stopped # Hohe Ausfallsicherheit: Neustart nach Reboot des Hosts
-    ports:
-      - "8085:80" # Host-Port 8085 -> Container-Port 80
+🏛️ Cluster-Architektur: Master & Worker
+Control Plane (Master - pi5-node-01): Verantwortlich für API-Management, Scheduling und den Cluster-Zustand.
 
+Worker Node (Agent - pi4-node-01): Führt die eigentlichen Anwendungs-Container (Pods) aus.
 
-Konzept,Imperativ (docker run),Deklarativ (docker compose)
-Befehl,docker run -d --name mi-server -p 8080:80 ...,docker compose up -d
-Dokumentation,"""Verloren"" im Terminalverlauf (unübersichtlich)",Gespeichert in der docker-compose.yml (IaC)
-Änderungen,Neustart mit neuem Befehl (komplex),"nano Änderung, dann docker compose up -d"
-Status,Unübersichtlich,docker compose ps (Health Checks)
+(Visualisierung der Cluster-Architektur)
 
-# 1. SSH-Verbindung zum Master-Node (Public-Key-Authentifizierung)
-ssh robert@pi5-node-01.local
+🛠️ Implementierungsschritte
+Kernel-Optimierung (Cgroups): Aktivierung von cgroup_memory und cpuset in /boot/firmware/cmdline.txt für strikte Ressourcenkontrolle.
 
-# 2. Erstellung der Verzeichnisstruktur (-p für Parents)
-mkdir -p ~/opt/webserver/html
+Initialisierung: Installation des Masters via K3s-Skript und Extraktion des Security-Tokens.
 
-# 3. Erstellung der IaC-Datei im Terminal
-nano docker-compose.yml
+Integration des Workers: Beitritt des Pi 4 zum Cluster über die Master-IP und den Token.
 
-# 4. Ausführung des deklarativen Deployments im Detached Mode (-d)
-docker compose up -d
+🔍 Troubleshooting (Exec Format Error): Beim ersten Test stießen wir auf einen Architektur-Fehler. Das Image war nicht für ARM64 optimiert. Lösung: Umstellung auf Multi-Arch-Images.
 
-# 5. Echtzeit-Einsicht in Container-Logs zur Fehlerbehebung
-docker logs -f vault_db
+🚀 Phase 5: Die große Migration & Production-Ready Setup
+Das Hauptziel dieses Meilensteins war die Migration von "El Banco" in das Kubernetes-Cluster und die Härtung des Systems für den Produktionseinsatz.
 
-# 6. SQL-Validierungsbefehle (Interaktive Exec)
-docker exec -it vault_db mariadb -u wp_user -p
-show databases;
+5.1 Die Basis: Deployments & Services
+Wir haben die monolithische Struktur in Microservices aufgeteilt:
 
+Deployment: Der "Manager", der sicherstellt, dass die Pods laufen.
 
-# 🚀 Phase 4: K3s Multi-Node Cluster (High Availability)
+Service: Der "Netzwerk-Router", der statische IPs (ClusterIP) oder externe Zugänge (NodePort 30082) zuweist.
 
-Nach der erfolgreichen Implementierung von Docker auf einem einzelnen Knoten haben wir heute die Infrastruktur auf ein **verteiltes System** skaliert. Wir nutzen **K3s** (Lightweight Kubernetes), um die Rechenleistung der Raspberry Pi 5 und Raspberry Pi 4 zu einem Cluster zu bündeln.
+💥 Der Chaos-Test (Self-Healing-Validierung)
+Um die Ausfallsicherheit zu beweisen, löschten wir absichtlich einen aktiven Pod:
 
----
+sudo kubectl delete pod <pod-name>
+Ergebnis: Das Control-Plane erkannte den Ausfall in Millisekunden und erstellte den Pod sofort neu. Die Anwendung blieb ununterbrochen erreichbar.
 
-## 🏛️ Cluster-Architektur: Master & Worker
+5.2 Datenpersistenz (Persistent Volumes)
+Das Problem: Container leiden unter "Amnesie". Stirbt ein Datenbank-Pod, sind alle Benutzerdaten verloren.Die Lösung: Trennung von Rechenleistung und Speicherplatz. Wir erstellten einen PersistentVolumeClaim (PVC), der als "virtuelle Festplatte" fungiert und Daten dauerhaft auf der SD-Karte des Hosts speichert.
 
-In dieser Konfiguration übernimmt die **Raspberry Pi 5** die Rolle des "Gehirns" (Control Plane), während die **Raspberry Pi 4** als "Muskel" (Worker Node) fungiert.
+# Auszug aus db-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-db-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 
-
-
-* **Control Plane (Master - Pi 5):** Verantwortlich für das API-Management, Scheduling und die Verwaltung des Cluster-Zustands.
-* **Worker Node (Agent - Pi 4):** Führt die eigentlichen Anwendungs-Container (Pods) aus.
-* **Kubelet:** Der Agent auf dem Worker-Node, der die Befehle des Masters entgegennimmt.
-
----
-
-## 🛠️ Schritt-für-Schritt Implementierung
-
-### 1. Kernel-Optimierung (Cgroups)
-Kubernetes benötigt eine strikte Ressourcenkontrolle. Da dies bei Raspberry Pis standardmäßig deaktiviert ist, mussten wir die Kernel-Parameter anpassen.
-
-* **Datei:** `/boot/firmware/cmdline.txt`
-* **Parameter:** `cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory`
+Test erfolgreich: Die Datenbank wurde zerstört und neu erstellt. Alle WordPress-Daten blieben durch den PVC vollständig erhalten.
 
 
+5.3 Security: K8s Secrets (Die kryptografische Vault)
+Das Problem: Passwörter standen als Klartext in den YAML-Dateien (ein massives Sicherheitsrisiko in GitHub).Die Lösung: Implementierung von Kubernetes Secrets. Die Passwörter wurden in Base64 verschlüsselt und als Referenz (valueFrom: secretKeyRef) an die Pods übergeben.
+# Sichere Übergabe von Credentials
+env:
+- name: MYSQL_ROOT_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: credenciales-banco
+      key: root-pass
 
-### 2. Initialisierung des Masters (Pi 5)
-Die Installation erfolgte über das offizielle K3s-Skript. Nach dem Setup haben wir den Sicherheits-Token extrahiert, um den Worker-Node zu autorisieren.
+5.4 Skalierung & Load Balancing
+Um hohen Traffic zu bewältigen, haben wir die Anwendung skaliert. Durch das Ändern eines einzigen Parameters (replicas: 3 im wp-deployment.yaml) multiplizierte Kubernetes unsere WordPress-Instanzen.
 
-```bash
-# Installation auf dem Master
-curl -sfL [https://get.k3s.io](https://get.k3s.io) | sh -
+Der interne Scheduler verteilte die Last intelligent auf unsere physischen Maschinen:
+robert@pi5-node-01:~/k8s-banco $ sudo kubectl get pods -o wide
+NAME                                     READY   STATUS    NODE
+cashier-wp-deployment-6cb4b845b6-9xz7r   1/1     Running   pi5-node-01
+cashier-wp-deployment-6cb4b845b6-b264z   1/1     Running   pi5-node-01
+cashier-wp-deployment-6cb4b845b6-cdps9   1/1     Running   pi4-node-01
 
-# Abrufen des Join-Tokens
-sudo cat /var/lib/rancher/k3s/server/node-token
+WordPress läuft nun gleichzeitig auf dem Pi 5 und dem Pi 4. Der K8s Service agiert als unsichtbarer Load Balancer.
 
-3. Integration des Workers (Pi 4)
-Der Pi 4 wurde mittels Token und Master-IP in den Cluster integriert. Ein kritischer Punkt war hier die vorherige Bereinigung einer fehlerhaften Standalone-Installation mittels k3s-uninstall.sh.
+5.5 Cluster-Hygiene (Zombie-Pods entfernen)
+Während der Experimente blieben alte Pods in einem endlosen Terminating Status auf nicht mehr existierenden Nodes stecken. Wir haben gelernt, wie man diese Zombie-Ressourcen gewaltsam aus der K8s-Datenbank entfernt:
+sudo kubectl delete pod <pod-name> --grace-period=0 --force
 
-# Beitritt zum Cluster vom Pi 4 aus
-curl -sfL [https://get.k3s.io](https://get.k3s.io) | K3S_URL=[https://192.168.0.20:6443](https://192.168.0.20:6443) K3S_TOKEN=<TOKEN> sh -
+5.6 Ingress: Der professionelle Zugang
+Anstatt über unhandliche Ports (http://192.168.0.20:30082) auf die Website zuzugreifen, haben wir einen Ingress Controller (Traefik) konfiguriert.
 
-🔍 Troubleshooting: "Exec Format Error" & Multi-Arch
-Beim ersten Deployment-Test stießen wir auf einen klassischen Architektur-Fehler: exec format error.
+Wir leiteten den Traffic auf eine saubere URL um:
 
-Problem: Das gewählte Image (hello-kubernetes:1.10) war nicht für die 64-Bit ARM-Architektur der Pi 5 optimiert.
+Host: elbanco.local
 
-Lösung: Umstellung auf Multi-Arch-Images (nginx:alpine). Diese enthalten Manifeste für verschiedene CPU-Typen (amd64, arm64, arm/v7) und garantieren die Lauffähigkeit auf beiden Knoten.
+DNS Trick: Anpassung der /etc/hosts Datei auf dem MacBook, um die URL lokal aufzulösen.
 
-Validierung des Workloads
-Wir haben ein Deployment mit 3 Replikaten erstellt, um die Verteilung (Scheduling) zu prüfen:
-
-# Befehl zur Prüfung der Verteilung
-sudo kubectl get pods -o wide
-![alt text](image-1.png)
-
-📈 Fazit & Lernerfolg
-Durch den Aufbau dieses Clusters haben wir die Abhängigkeit von einer einzelnen Maschine eliminiert. Wir haben gelernt:
-
-Wie Kubernetes Entscheidungen über das Scheduling trifft.
-
-Warum CPU-Architekturen (arm64 vs. arm/v7) bei der Image-Wahl entscheidend sind.
-
-Wie man ein Self-Healing-System konfiguriert, das Workloads automatisch neu verteilt.
-
-
-# 🚀 Meilenstein: Die große Migration – Von Docker zu Kubernetes (K3s)
-
-**Datum:** 01. April 2026  
-**Projekt:** "El Banco" (WordPress + MariaDB)  
-**Status:** Erfolgreich in Produktion (K3s Cluster)
-
-## 🎯 Zielsetzung
-Das Hauptziel dieses Meilensteins war die Migration unserer Webanwendung von einem monolithischen Docker-Compose-Setup (Single-Node) in ein ausfallsicheres, orchestriertes Kubernetes-Cluster, bestehend aus einem Master-Node (Pi 5) und einem Worker-Node (Pi 4).
-
-## 🏗️ Systemarchitektur
-
-
-
-Um die Anwendung in Kubernetes zu betreiben, haben wir die monolithische Struktur in Microservices aufgeteilt. Jeder Service nutzt zwei primäre Kubernetes-Ressourcen:
-1. **Deployment:** Der "Manager", der sicherstellt, dass die gewünschte Anzahl an Pods (Containern) immer läuft.
-2. **Service:** Der "Netzwerk-Router", der den Pods eine feste interne IP (ClusterIP) oder einen externen Zugang (NodePort) zuweist.
-
-### Komponenten:
-* **Datenbank (Das Backend):** * Image: `mariadb:10.11`
-  * Netzwerk: Isoliert über `ClusterIP` (Port 3306). Nur innerhalb des Clusters erreichbar.
-* **Frontend (Das CMS):** * Image: `wordpress:latest`
-  * Netzwerk: Exponiert in das lokale Heimnetzwerk über einen `NodePort` (Port 30082).
-
-## 🛠️ Durchgeführte Schritte
-
-1. **Rückbau der alten Infrastruktur:** Herunterfahren des alten Docker-Compose-Setups (`docker compose down`), um Portkonflikte zu vermeiden.
-2. **Implementierung der Datenbank-Manifeste:** Erstellung und Anwendung von `db-deployment.yaml` und `db-service.yaml`.
-3. **Implementierung der Frontend-Manifeste:** Erstellung und Anwendung von `wp-deployment.yaml` und `wp-service.yaml`. Die Verbindung zur Datenbank erfolgte dynamisch über den DNS-Namen des K8s-Services (`vault-db-service`).
-4. **Verifizierung:** Überprüfung des Status mit `kubectl get pods` und `kubectl get svc`.
-
-## 💥 Der Chaos-Test (Self-Healing-Validierung)
-
-
-
-Um die Ausfallsicherheit (High Availability) und das *Self-Healing* des Kubernetes-Clusters zu beweisen, haben wir einen "Chaos-Test" durchgeführt:
-* **Aktion:** Absichtliches Löschen eines aktiven Pods (`kubectl delete pod <pod-name>`).
-* **Ergebnis:** Das Kubernetes-Control-Plane hat den Ausfall in Millisekunden erkannt und den Pod sofort neu erstellt (`Terminating` ➡️ `ContainerCreating` ➡️ `Running`). Die Anwendung blieb für den Endbenutzer ununterbrochen erreichbar.
-
-## 🔜 Nächste Schritte
-* **Persistenz (Persistent Volumes):** Behebung des "Amnesie"-Problems der Container. Implementierung von PVs und PVCs, um sicherzustellen, dass Datenbankeinträge auch nach dem Zerstören eines Pods dauerhaft auf der Festplatte gespeichert bleiben.
+(Traffic-Routing über Traefik Ingress)
+📈 Fazit
+Dieses Projekt demonstriert den erfolgreichen Aufbau einer Production-Ready Architektur. Das System heilt sich selbst, speichert Daten persistent ab, verschlüsselt Geheimnisse, skaliert über mehrere physische Raspberry Pis und routet Traffic über professionelle Ingress-Regeln.
