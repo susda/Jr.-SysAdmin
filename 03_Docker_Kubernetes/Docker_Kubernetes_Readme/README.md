@@ -167,3 +167,40 @@ Durch die Anpassung der `/etc/hosts` auf dem Client-Mac routet Traefik den Traff
 
 ## 🏁 Fazit
 Dieses Projekt demonstriert den erfolgreichen Aufbau einer **Production-Ready Architektur**. Das System heilt sich selbst, speichert Daten persistent ab, verschlüsselt Geheimnisse, skaliert nahtlos über mehrere Hardware-Knoten und routet Traffic über professionelle Ingress-Regeln.
+
+
+
+## 🔄 Phase 6: Lift & Shift - Data & Application Migration
+
+Nachdem die K3s-Infrastruktur (Secrets, PVCs, Ingress) in Phase 5 erfolgreich bereitgestellt wurde, bestand der nächste logische Schritt darin, die eigentlichen Geschäftsdaten und Custom-Frontends aus dem alten Single-Node-Docker-Setup in das neue High-Availability-Cluster zu migrieren.
+
+### 6.1 Datenbank-Transplantation (MariaDB)
+Wir haben die MySQL-Datenbank ohne Zwischenspeicherung direkt vom lokalen Host in den laufenden Kubernetes-Pod injiziert. Hierbei kam ein direkter Stream (`<`) zum Einsatz.
+
+```bash
+# Injektion des SQL-Dumps in den Pod via kubectl exec (Silent Mode -i)
+sudo kubectl exec -i vault-db-deployment-77764f4496-wl44s -- mariadb -u wp_user -p[PASSWORD] wordpress_db < ~/mainz-web/migracion_mainz.sql
+
+6.2 Troubleshooting: Der "WordPress-Geist" (HTTP 301 Redirects)
+Das Problem: Nach der Migration der Datenbank leitete WordPress (elbanco.local) automatisch auf den alten Docker-Port (8082) um.
+Die Ursache: WordPress speichert die absolute URL (siteurl und home) fest in der wp_options Tabelle.
+Die Lösung: Eine direkte chirurgische SQL-Abfrage im K8s-Pod, um die URLs auf den neuen K3s-NodePort/Ingress anzupassen, ohne Plugins verwenden zu müssen.
+
+# Live-Update der Datenbank im Kubernetes-Cluster
+sudo kubectl exec -i vault-db-deployment-77764f4496-wl44s -- mariadb -u wp_user -p[PASSWORD] wordpress_db -e "UPDATE wp_options SET option_value = '[http://192.168.0.20:30082](http://192.168.0.20:30082)' WHERE option_name IN ('siteurl', 'home');"
+
+6.3 Frontend-Migration: Die Matrix-UI (Nginx)
+Bei der Architektur-Analyse stellten wir fest, dass das System aus zwei getrennten Services bestand: Dem WordPress-Backend und einem statischen Nginx-Frontend (Matrix-Animation & Krypto-API).
+
+Da K8s-Pods standardmäßig leer starten, mussten wir den statischen HTML-Code in die laufenden Nginx-Replikas kopieren.
+
+# Kopieren der lokalen Frontend-Dateien in den Nginx-Pod
+sudo kubectl cp ~/opt/webserver/html/index.html promo-web-7f65c845b-5k6w9:/usr/share/nginx/html/index.html
+
+6.4 Live-Demonstration: Kubernetes Load Balancing
+Durch das manuelle Kopieren der index.html in nur einen der drei Frontend-Pods konnten wir das Kubernetes-Load-Balancing (Round Robin) visuell beweisen.
+
+Beim wiederholten Aktualisieren (F5) der Seite im Browser wechselte die Anzeige dynamisch zwischen der Standard-"Welcome to nginx!"-Seite und der Matrix-UI, je nachdem, an welchen Pod der Service den Traffic weiterleitete.
+
+💡 Next Steps für Produktion: Um das manuelle Kopieren in jeden einzelnen Pod zu vermeiden, wird in der nächsten Phase ein Shared Persistent Volume (RWX) oder ein ConfigMap implementiert, damit alle Replikas auf dieselbe Codebasis zugreifen.
+
